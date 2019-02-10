@@ -13,14 +13,13 @@
 
 //using namespace std;
 
-void checkCollision(agent& a1, agent& a2, interaction& i) { //change return type
-
+void checkCollision(agent& a1, agent& a2, interaction& i) {
 	bool tmp1, tmp2;
 	tmp1 = a1.getDirection();
 	tmp2 = a2.getDirection();
 	i.direction = tmp1;
 	i.crash = !(tmp1 == tmp2);
-}
+}//should make this method internal to interaction struct
 
 void printProbs(vector<frequentist>& f, vector<psuedoBayes>& b) {
 	for (int i = 0; i < f.size(); i++) {
@@ -28,7 +27,36 @@ void printProbs(vector<frequentist>& f, vector<psuedoBayes>& b) {
 	}
 }
 
-void runSim(int numAgents, double inc,double decay) //want to add default arguments for bayes inc method, and decay val
+void printStatus(int freqCount, int bayesCount, int randCount, int interactionCount) {
+	double f = double(freqCount) / interactionCount;
+	double b = double(bayesCount) / interactionCount;
+	double r = double(randCount) / interactionCount;
+	cout << interactionCount << " f: " << f << " b: " << b << " r: " << r << endl;
+}
+
+void partialSim(vector<frequentist>& frqs, vector<psuedoBayes>& bayes, vector<randAgent>& rands, int sliceSize) {
+	int fCnt, bCnt, rCnt;
+	fCnt = bCnt = rCnt = 0;
+	for (int i = 0; i < sliceSize; i++) {
+		int first, second;
+		interaction itF, itB, itR;
+		first = rand() % frqs.size();
+		second = rand() % frqs.size();
+		checkCollision(frqs[first], frqs[second], itF);
+		checkCollision(bayes[first], bayes[second], itB);
+		checkCollision(rands[first], rands[second], itR);
+
+		frqs[first].updateProb(itF); frqs[second].updateProb(itF);
+		bayes[first].updateProb(itB); bayes[second].updateProb(itF);
+
+		fCnt += itF.crash;
+		bCnt += itB.crash;
+		rCnt += itR.crash;
+	}
+	printStatus(fCnt, bCnt, rCnt, sliceSize);
+}
+
+void runSim(int numAgents, double inc, double decay, int limit) //want to add default arguments for bayes inc method, and decay val
 {	
 	vector<frequentist> frqs(numAgents);
 	vector<psuedoBayes> bayes;
@@ -41,66 +69,29 @@ void runSim(int numAgents, double inc,double decay) //want to add default argume
 
 	time_t tm;
 	srand(time(&tm)); //double check this is the right way to do this
+					  //should I be reinitizializing
 	cout << "prints percentage of crashes as decimal." << endl;
-	int bayesCount = 0;
-	int freqCount = 0;
-	int randCount = 0;
-	int interactionCount = 0;
+	int printInterval = limit / 5;
 
-	int iterationLimit = 10000;
-	for (int i = 0; i <= iterationLimit; i++) {
-		for (int j = 0; j < frqs.size(); j++) {
-			vector<bool> checkedNums(20);
-			int first, second;
-			do {
-				first = (rand() % frqs.size());
-			} while (checkedNums[first]);
-
-			do {
-				second = (rand() % frqs.size());
-			} while (checkedNums[second] && first == second);
-
-			bool tmp1, tmp2, tmp3, tmp4, tmp5, tmp6;
-			interaction fr, ba,ra;
-			checkCollision(frqs[first], frqs[second], fr);
-			checkCollision(bayes[first], bayes[second], ba);
-			checkCollision(rands[first], rands[second], ra);
-
-			freqCount += fr.crash;
-			bayesCount += ba.crash;
-			randCount += ra.crash;
-
-			frqs[first].updateProb(fr); frqs[second].updateProb(fr);
-			bayes[first].updateProb(ba); bayes[second].updateProb(ba);
-			rands[first].updateProb(ra); rands[second].updateProb(ra); //is this sequence correct
-
-
-			interactionCount++;
-		}
-
-		if (i % 1000 == 0) {
-			double f = double(freqCount) / interactionCount;
-			double b = double(bayesCount) / interactionCount;
-			double r = double(randCount) / interactionCount;
-			cout << interactionCount << " f: " << f << " b: " << b << " r: " << r << endl;
-		}
-	} //percent of interaction that is crash
-
-	cout << "=======\n=======\n" << endl; // should add average for each kind of agent
-
-	printProbs(frqs, bayes);
-
+	for (int i = 0; i <= limit; i+=printInterval) {
+		partialSim(frqs, bayes, rands, printInterval);
+	}
 }
 
 int main() {
 	double incs[] = { .55,.54,.53,.52,.51,.5,.5,.49,.48,.47,.46,.45 };
 	double decays[] = { .95,.9,.85,.8,.75 };
-
+	int simLimit = 500000;
+	char pause;
 	for (double i : incs) {
 		for (double d : decays) {
-			cout << "******" << endl << "******" << endl;
-			runSim(20 ,i, d);
+			cout << "inc val= " << i << " decay val= " << d << endl;
+			runSim(20 ,i, d, simLimit);
+			cout << "******" << endl;
 		}
+		cout << "=====\n=====\n" << endl;
+		//cin >> pause;
+		system("PAUSE");
 	}
 
 	//runSim(20, 0.5, 0.95);
